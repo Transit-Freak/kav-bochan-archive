@@ -1,0 +1,39 @@
+name: verify
+# בודק שהארכיון ב-Pages עונה: קובץ אחד מכל תיקייה, קוד 200 וכותרת CORS (הקו הבוחן קורא ממנו מדומיין אחר).
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/verify.yml']
+  workflow_run:
+    workflows: [sync]
+    types: [completed]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: .github
+      - name: בדיקת קבצים באתר
+        run: |
+          set -euo pipefail
+          base="https://transit-freak.github.io/kav-bochan-archive"
+          stops="early-stops/miu-2012-07.json.gz"
+          pat=$(git ls-tree -r --name-only HEAD early-patterns | head -1 || true)
+          [ -n "$pat" ] || pat=$(curl -fsS "https://api.github.com/repos/${GITHUB_REPOSITORY}/git/trees/main?recursive=1" | grep -o '"path": *"early-patterns/[^"]*\.json[^"]*"' | head -1 | sed 's/.*"\(early-patterns[^"]*\)"/\1/')
+          ok=true
+          for f in "$stops" "$pat"; do
+            [ -n "$f" ] || { echo "::error::לא נמצא קובץ לבדיקה"; ok=false; continue; }
+            h=$(curl -sS -o /tmp/body -D - -H "Origin: https://transit-freak.github.io" "$base/$f")
+            code=$(echo "$h" | head -1 | awk '{print $2}')
+            cors=$(echo "$h" | grep -i '^access-control-allow-origin:' | tr -d '\r' || true)
+            size=$(stat -c %s /tmp/body)
+            echo "$f → $code, $size bytes, ${cors:-אין CORS}"
+            [ "$code" = "200" ] && [ -n "$cors" ] && [ "$size" -gt 0 ] || ok=false
+          done
+          $ok
