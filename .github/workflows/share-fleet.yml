@@ -1,0 +1,61 @@
+name: share-fleet
+# באנרי השיתוף (וואטסאפ) של צי הרכבים — שלמה 23.10. מצויר כאן ולא בריפו הראשי: שם הם עלו ל-releases,
+# וכל קובץ היה בקשה נפרדת ש-GitHub חסם אחרי כאלף בשעה. כאן כל הקבצים נכנסים בדחיפה.
+# נשמרים בענף share-fleet (לא ב-main), כדי לא להיכנס לאתר הארכיון ב-Pages.
+# הקוד והנתונים — מהריפו הראשי (ציבורי, בלי טוקן): tools/share_fleet_banners.py render.
+# רץ לפני דפי השיתוף בריפו הראשי (11:00 UTC), שקוראים את share-fleet/index.json.
+on:
+  schedule:
+    - cron: '20 9 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: share-fleet
+  cancel-in-progress: false
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: הענף share-fleet
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          url="https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git ls-remote --exit-code "$url" refs/heads/share-fleet >/dev/null; then
+            git clone -q --depth 1 --single-branch -b share-fleet "$url" out
+          else
+            mkdir out && git -C out init -q -b share-fleet && git -C out remote add origin "$url"
+            printf 'באנרי השיתוף של צי הרכבים — נוצר אוטומטית (share-fleet.yml), לא לגעת.\n' > out/README.md
+          fi
+      - name: הקוד והנתונים מהריפו הראשי
+        run: |
+          set -euo pipefail
+          git clone -q --depth 1 --filter=blob:none --sparse https://github.com/Transit-Freak/kav-bochan.git src
+          git -C src sparse-checkout set --no-cone /tools/ /fleet/index.html /fleet/icon-512.png /fleet/data/fleet.json /fleet/data/fleet-official.json /fleet/data/fleet-cities.json
+      - name: ציור החסרים ומחיקת מה שכבר לא בשימוש
+        working-directory: src
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright-core >/dev/null 2>&1
+          python3 tools/share_fleet_banners.py render "$GITHUB_WORKSPACE/out"
+      - name: דחיפה במנות
+        working-directory: out
+        run: |
+          set -euo pipefail
+          push() { for i in 1 2 3; do git push -q origin HEAD:share-fleet && return 0; sleep 15; done; return 1; }
+          # מנה לכל תו ראשון של השם (כ-1,250 קבצים, כ-50MB) — GitHub דוחה דחיפה ענקית
+          for c in 0 1 2 3 4 5 6 7 8 9 a b c d e f; do
+            git add -A -- "fl-$c*" || true
+            git diff --cached --quiet && continue
+            git commit -q -m "באנרי צי הרכבים ($c)"
+            push
+          done
+          # הרשימה אחרונה — כך היא מצביעה רק על קבצים שכבר נדחפו
+          git add -A .
+          git diff --cached --quiet || { git commit -q -m "באנרי צי הרכבים — רשימה"; push; }
+          ls fl-*.jpg 2>/dev/null | wc -l
