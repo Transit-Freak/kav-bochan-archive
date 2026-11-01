@@ -45,7 +45,9 @@ jobs:
           rsync -a /tmp/src/line-history/data/early-stops/ early-stops/
           rm -rf /tmp/src
           changed=false
-          push() { git commit -q -m "$1" && changed=true && for i in 1 2 3; do git push -q origin HEAD:main && return 0; sleep 15; done; return 1; }
+          # 01.11: דחיפה נדחתה שלוש פעמים כי workflow אחר כאן (share-fleet) דחף בינתיים — ובלי pull
+          # הניסיון החוזר נדחה שוב, והסנכרון נכשל. עכשיו rebase מעל מה שנדחף, ורק אז ניסיון חוזר
+          push() { git commit -q -m "$1" && changed=true && for i in 1 2 3 4 5; do git push -q origin HEAD:main && return 0; sleep 10; git pull -q --rebase origin main || { git rebase --abort; return 1; }; done; return 1; }
           # מנה לכל תיקייה (שתי ספרות), ודחיפה כשהמנה המצטברת עוברת ~700MB — GitHub דוחה דחיפה מעל 2GB
           for d in early-stops early-patterns/*/; do
             git add -A "$d"
