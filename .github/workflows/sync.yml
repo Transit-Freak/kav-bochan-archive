@@ -39,8 +39,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rsync -a --delete /tmp/src/line-history/data/early-patterns/ early-patterns/
-          rsync -a --delete /tmp/src/line-history/data/early-stops/ early-stops/
+          # בלי --delete (שלמה 01.11): הקבצים יימחקו מהריפו הראשי כשהייבוא יסתיים, והארכיון כאן נשאר
+          # המקור היחיד שלהם. מחיקה בריפו הראשי לא אמורה למחוק כלום כאן
+          rsync -a /tmp/src/line-history/data/early-patterns/ early-patterns/
+          rsync -a /tmp/src/line-history/data/early-stops/ early-stops/
           rm -rf /tmp/src
           changed=false
           push() { git commit -q -m "$1" && changed=true && for i in 1 2 3; do git push -q origin HEAD:main && return 0; sleep 15; done; return 1; }
