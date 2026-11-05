@@ -31,7 +31,8 @@ jobs:
         run: |
           set -euo pipefail
           git clone -q --depth 1 --filter=blob:none --sparse https://github.com/Transit-Freak/kav-bochan.git /tmp/src
-          git -C /tmp/src sparse-checkout set --no-cone /line-history/data/early-patterns/ /line-history/data/early-stops/
+          # גם קבצי הנסיעות התפעוליות של קו פח (05.11): בריפו הראשי נשמרים רק 21 יום, וכאן כל ההיסטוריה
+          git -C /tmp/src sparse-checkout set --no-cone /line-history/data/early-patterns/ /line-history/data/early-stops/ '/bus/data/days/*.deadhead.json'
           du -sh /tmp/src/line-history/data/early-patterns /tmp/src/line-history/data/early-stops
       - name: העתקה ודחיפה במנות (עד ~700MB לדחיפה)
         id: copy
@@ -43,6 +44,7 @@ jobs:
           # המקור היחיד שלהם. מחיקה בריפו הראשי לא אמורה למחוק כלום כאן
           rsync -a /tmp/src/line-history/data/early-patterns/ early-patterns/
           rsync -a /tmp/src/line-history/data/early-stops/ early-stops/
+          mkdir -p deadhead && rsync -a --include='*.deadhead.json' --exclude='*' /tmp/src/bus/data/days/ deadhead/
           rm -rf /tmp/src
           changed=false
           # 01.11: דחיפה נדחתה שלוש פעמים כי workflow אחר כאן (share-fleet) דחף בינתיים — ובלי pull
@@ -59,7 +61,7 @@ jobs:
           git add -A .
           if ! git diff --cached --quiet; then push "סנכרון ארכיון"; fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          du -sh early-patterns early-stops
+          du -sh early-patterns early-stops deadhead
   deploy:
     needs: sync
     if: needs.sync.outputs.changed == 'true' || github.event_name != 'schedule'
