@@ -1,9 +1,12 @@
 name: sync
-# מעתיק את early-patterns ו-early-stops מהריפו הראשי (ציבורי — בלי טוקן) ומפרסם אותם ב-Pages.
-# הייבוא השעתי בריפו הראשי רץ ב-:17 ולוקח עד כ-שעה; כאן רצים ב-:47 ומשלימים מה שנוסף.
+# מעתיק את קבצי הנסיעות התפעוליות של קו פח (deadhead) מהריפו הראשי (ציבורי — בלי טוקן) ומפרסם ב-Pages.
+# בריפו הראשי נשמרים רק 21 יום, וכאן כל ההיסטוריה.
+#
+# early-patterns ו-early-stops (הארכיון ההיסטורי של "הקו בזמן") הועתקו לכאן עד שהייבוא ההיסטורי הסתיים
+# (11.2026), ואז נמחקו מהריפו הראשי. העותק כאן הוא המקור היחיד שלהן — לא מסנכרנים ולא מוחקים אותן.
 on:
   schedule:
-    - cron: '47 * * * *'
+    - cron: '47 */6 * * *'
   push:
     branches: [main]
     paths: ['.github/workflows/sync.yml']
@@ -18,50 +21,39 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     outputs:
       changed: ${{ steps.copy.outputs.changed }}
     steps:
-      - name: מקום בדיסק
-        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+      # רק deadhead — בלי להוריד את כל הארכיון הכבד בכל ריצה
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: הורדת הארכיון מהריפו הראשי
+          filter: blob:none
+          sparse-checkout: |
+            deadhead
+      - name: הורדת קבצי deadhead מהריפו הראשי
         run: |
           set -euo pipefail
           git clone -q --depth 1 --filter=blob:none --sparse https://github.com/Transit-Freak/kav-bochan.git /tmp/src
-          # גם קבצי הנסיעות התפעוליות של קו פח (05.11): בריפו הראשי נשמרים רק 21 יום, וכאן כל ההיסטוריה
-          git -C /tmp/src sparse-checkout set --no-cone /line-history/data/early-patterns/ /line-history/data/early-stops/ '/bus/data/days/*.deadhead.json'
-          du -sh /tmp/src/line-history/data/early-patterns /tmp/src/line-history/data/early-stops
-      - name: העתקה ודחיפה במנות (עד ~700MB לדחיפה)
+          git -C /tmp/src sparse-checkout set --no-cone '/bus/data/days/*.deadhead.json'
+          ls /tmp/src/bus/data/days | wc -l
+      - name: העתקה ודחיפה
         id: copy
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # בלי --delete (שלמה 01.11): הקבצים יימחקו מהריפו הראשי כשהייבוא יסתיים, והארכיון כאן נשאר
-          # המקור היחיד שלהם. מחיקה בריפו הראשי לא אמורה למחוק כלום כאן
-          rsync -a /tmp/src/line-history/data/early-patterns/ early-patterns/
-          rsync -a /tmp/src/line-history/data/early-stops/ early-stops/
+          # בלי --delete: הריפו הראשי מוחק קבצים ישנים מ-21 יום, וכאן הם נשמרים
           mkdir -p deadhead && rsync -a --include='*.deadhead.json' --exclude='*' /tmp/src/bus/data/days/ deadhead/
           rm -rf /tmp/src
           changed=false
-          # 01.11: דחיפה נדחתה שלוש פעמים כי workflow אחר כאן (share-fleet) דחף בינתיים — ובלי pull
-          # הניסיון החוזר נדחה שוב, והסנכרון נכשל. עכשיו rebase מעל מה שנדחף, ורק אז ניסיון חוזר
+          # 01.11: דחיפה נדחתה כי workflow אחר כאן (share-fleet) דחף בינתיים — rebase ורק אז ניסיון חוזר
           push() { git commit -q -m "$1" && changed=true && for i in 1 2 3 4 5; do git push -q origin HEAD:main && return 0; sleep 10; git pull -q --rebase origin main || { git rebase --abort; return 1; }; done; return 1; }
-          # מנה לכל תיקייה (שתי ספרות), ודחיפה כשהמנה המצטברת עוברת ~700MB — GitHub דוחה דחיפה מעל 2GB
-          for d in early-stops early-patterns/*/; do
-            git add -A "$d"
-            if git diff --cached --quiet; then continue; fi
-            # גודל כל מה שממתין לדחיפה (קבצים שנמחקו לא נספרים)
-            acc=$(git diff --cached --name-only --diff-filter=AM -z | du -cb --files0-from=- 2>/dev/null | tail -1 | cut -f1)
-            if [ "${acc:-0}" -gt 700000000 ]; then push "סנכרון ארכיון (מנה)"; fi
-          done
-          git add -A .
-          if ! git diff --cached --quiet; then push "סנכרון ארכיון"; fi
+          git add -A deadhead
+          if ! git diff --cached --quiet; then push "סנכרון deadhead"; fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          du -sh early-patterns early-stops deadhead
+          du -sh deadhead
   deploy:
     needs: sync
     if: needs.sync.outputs.changed == 'true' || github.event_name != 'schedule'
