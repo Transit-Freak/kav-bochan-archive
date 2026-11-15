@@ -137,3 +137,19 @@ pubdest-hist: מושבת ידנית מאז 31.08. fleet-probe: גישוש חד-�
 | `strip_tf_events.py` | 2026-08-09: כלי למחיקת אירועי הארכיון לקראת בנייה מחדש |
 | `sweep_line_pages.mjs` | 2026-08-10: סריקת כל 13,189 עמודי הקווים, וכתובת של קו נקראת גם אחרי הטעינה |
 | `taxi_archaeology.py` | 2026-08-23: taxi_archaeology: HEAD לפני כל צילום — תאריך חסר לא מפיל את הסריקה |
+
+## סבב 2 (15.11.2026)
+
+- **הקומיט האחרון ב-main שבו הקבצים עוד היו:**
+  [`a7bc736`](https://github.com/Transit-Freak/kav-bochan/tree/a7bc736d168114966a32e3f934964cf4286ad8e0)
+- **שחזור:** `git show a7bc736d168114966a32e3f934964cf4286ad8e0:tools/X`
+- **מה עבר:** 3 workflows ו-6 סקריפטים, כ-1,400 שורות. לכל אחד מהם יש אישור של שלמה.
+
+| קובץ | למה הועבר |
+|---|---|
+| `workflows/sakachot-pilot.yml` + `tools/sakachot_pilot.py` | פיילוט חד-פעמי. רץ לאחרונה ב-01.09 |
+| `workflows/bitzua-survey.yml` + `tools/bitzua_survey.py` | סקר להפעלה ידנית שלא הופעל אף פעם. כיוון שלא הופעל, לא נוצרה תיקייה `docs/surveys` |
+| `workflows/compare-mot.yml` + `tools/compare_mot.py` | השוואה חד-פעמית לקובצי משרד התחבורה. רצה לאחרונה ב-06.09. התוצאות ב-`docs/compare` נשארו בריפו הראשי |
+| `tools/itm.py` | אף קובץ לא מייבא אותו. יש העתקים מקומיים של המרת ITM בסקריפטים אחרים |
+| `tools/taba_merge.py` | אף workflow או סקריפט לא קורא לו, גם לא `rail-tunnels.yml`. עודכן לאחרונה ב-20.09 |
+| `tools/check_lh_ui.mjs` | בדיקת עשן ישנה של "הקו בזמן" שלא הייתה מחוברת לשום workflow. הבדיקות הייחודיות שלה מוזגו ל-`check_line_history_ui.mjs` בריפו הראשי (שלב ה') |
